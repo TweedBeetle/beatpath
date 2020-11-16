@@ -8,9 +8,9 @@ matplotlib
 scipy
 tinydb
 cachetools
-numpy
 deap
 matplotlib
 prompt_toolkit
 click
 fuzzyfinder
+numpy==1.19.3
