@@ -1,0 +1,5 @@
+spotify_client_id = '84294df0c105494194cf10386d6f3301'
+spotify_client_secret = 'dbef3a25a6844a89a8dab306b259c611'
+
+headphones_api_key = '9be5e06dec7fb8f7c0160577746dacb7'
+rekodbox_database_key = '402fd482c38817c35ffa8ffb8c7d93143b749e7d315df7a81732a1ff43608497'

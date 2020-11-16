@@ -1,0 +1,16 @@
+spotipy
+networkx
+mutagen
+tinytag
+tqdm
+pandas
+matplotlib
+scipy
+tinydb
+cachetools
+numpy
+deap
+matplotlib
+prompt_toolkit
+click
+fuzzyfinder

@@ -1,0 +1,9 @@
+chamelot system:
+  adjacent or 2 or 5 -> differnt path costs?
+
+set graph with
+
+spotipy section might be interesting
+
+https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/
+
