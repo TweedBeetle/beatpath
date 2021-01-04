@@ -1,4 +1,5 @@
 import time
+from pprint import pformat
 
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 import spotipy
@@ -53,14 +54,42 @@ def get_audio_featureses(track_ids):
     return sp.audio_features(track_ids)
 
 
+@list_cached(LRUCache(maxsize=10000), key=id)
+@execute_in_chunks()
+def get_tracks_data(track_ids):
+    tracks = sp.tracks(track_ids)
+    # print(tracks)
+    return tracks['tracks']
+
+
 # @list_cached(PersistentLRUCache(location='cache/audio_features', maxsize=10000), key=id)
 # @list_cached(LRUCache(maxsize=10000), key=id)
 def get_audio_features(track_id):
     return get_audio_featureses([track_id])[0]
 
 
-def get_energy_level(track_id):
+def get_track_data(track_id):
+    return get_tracks_data([track_id])[0]
+
+
+def get_energy(track_id):
     return get_audio_features(track_id)['energy']
+
+
+def get_valence(track_id):
+    return get_audio_features(track_id)['valence']
+
+
+def get_popularity(track_id):
+    return get_track_data(track_id)['popularity']
+
+
+def get_feature(track_id, feature):
+    if feature in ['popularity']:
+        return get_track_data(track_id)[feature]
+    else:
+        # print(get_audio_features(track_id).keys())
+        return get_audio_features(track_id)[feature]
 
 
 # @list_cached(LRUCache(maxsize=10000), key=id)
@@ -118,12 +147,52 @@ def add_tracks_to_playlist(track_ids, playlist_id):
     current_user = user_sp.me()
 
     for chunk in chunks(track_ids, 1):
-        user_sp.user_playlist_add_tracks(
+        user_sp.playlist_add_items(
             playlist_id=playlist_id,
-            tracks=chunk,
-            user=current_user['id'],
+            items=chunk,
+            # user=current_user['id'],
         )
         # time.sleep(1.01)
+
+
+def get_user_playlists(limit=50):  # TODO: fix so that i get all playlists when more than 50 exist
+    playlists = get_user_sp().current_user_playlists(limit=limit)['items']
+    # print(playlists)
+    return playlists
+
+
+def playlist_with_name_exists(name):
+    return any([playlist['name'] == name for playlist in get_user_playlists()])
+
+
+def delete_all_playlists_with_name(name, max=1):
+    user_sp = get_user_sp()
+    current_user = user_sp.me()
+
+    playlists_to_delete = list(filter(lambda playlist: playlist['name'] == name, get_user_playlists()))
+    if len(playlists_to_delete) > max:
+        print(f'to many playlists:\n{pformat(playlists_to_delete)}')
+        return
+
+    for playlist in playlists_to_delete:
+        user_sp.current_user_unfollow_playlist(playlist['id'])
+
+    # for playlist in get_user_playlists():
+    #     if playlist['name'] == name:
+    #         print(f'deleting {playlist}')
+    #         # user_sp.current_user_unfollow_playlist(playlist)
+
+
+def get_playlist_id_by_name(name):
+    playlists = list(filter(lambda playlist: playlist['name'] == name, get_user_playlists()))
+
+    if len(playlists) == 0:
+        raise RuntimeError(f'no playlist "{name}" found')
+
+    if len(playlists) > 1:
+        print(f'multiple playlists "{name}" found. using first')
+
+    return playlists[0]['uri']
 
 
 def delete_playlist_by_name_if_present(playlist_name):
@@ -284,7 +353,7 @@ if __name__ == '__main__':
     pass
 
     # get_energy_level(tids[0])
-    print(get_energy_level('spotify:track:7mA03cPnG3UkLgf1ed87fI'))
+    print(get_energy('spotify:track:7mA03cPnG3UkLgf1ed87fI'))
 
     # fs = get_audio_features(tids)
     # fss = sorted(fs, key=lambda f: f['danceability'])

@@ -372,57 +372,201 @@ class PathState:
 # @todo: cli
 
 class PathBuilder:
-    def __init__(self, target_energy_levels, set_track_ids=None, num_recommendations_as_sources=100, source_track_ids=None, max_energy_delta=0.035,
-                 tempo_range=(115, 140),
-                 min_danceability=0.6,
-                 max_tempo_delta=10):
+    def __init__(self,
+                 set_track_ids,
+                 num_recommendations_as_sources=100,
+                 vibe_track_ids=None,
+                 min_choices=5,
+                 num_tracks=30,
+                 **kwargs
+                 # max_energy_eps=0.05,
+                 # max_energy_delta=0.1,
+                 # min_energy=0.0,
+                 # # max_valence_eps=0.05,
+                 # max_valence_delta=0.1,
+                 # min_danceability=0.6,
+                 # max_tempo_delta=10,
+                 ):
+
+        self.params = dict()
+
+        self.simple_attributes = [
+            "acousticness",
+            "danceability",
+            # "duration_ms",
+            "energy",
+            "instrumentalness",
+            # "key",
+            "liveness",
+            # "loudness",
+            # "mode",
+            "popularity",
+            "speechiness",
+            "tempo",
+            # "time_signature",
+            "valence",
+        ]
+        for attribute in self.simple_attributes:
+
+            param = f'{attribute}_targets'
+            if param in kwargs:
+                assert len(kwargs[param]) == num_tracks
+                self.params[param] = kwargs[param]
+            else:
+                self.params[param] = [None] * num_tracks
+
+            for prefix in ["min", "max"]:
+                param = prefix + '_' + attribute
+                if param in kwargs:
+                    self.params[param] = kwargs[param]
+                else:
+                    if attribute == 'popularity':
+                        self.params[param] = 0 if prefix == 'min' else 100
+                    elif attribute == 'tempo':
+                        self.params[param] = 1 if prefix == 'min' else 300
+                    else:
+                        self.params[param] = 0 if prefix == 'min' else 1
+
+            for suffix in ["delta", "eps"]:
+                param = 'max_' + attribute + '_' + suffix
+                if param in kwargs:
+                    self.params[param] = kwargs[param]
+                else:
+                    if attribute == 'popularity':
+                        self.params[param] = 100
+                    elif attribute == 'tempo':
+                        self.params[param] = 300
+                    else:
+                        self.params[param] = 1
 
         if set_track_ids is None:
             set_track_ids = []
-        assert num_recommendations_as_sources or source_track_ids
+        assert num_recommendations_as_sources or vibe_track_ids
 
-        self.recommendations_as_sources = num_recommendations_as_sources
+        self.num_recommendations_as_sources = num_recommendations_as_sources
 
-        if source_track_ids is None:
-            source_track_ids = set()
-        self.source_track_ids = set(source_track_ids)
+        if vibe_track_ids is None:
+            vibe_track_ids = set()
+        self.vibe_track_ids = set(vibe_track_ids)
 
-        self.target_energy_levels = target_energy_levels
-        self.max_energy_delta = max_energy_delta
+        # self.target_energy = target_energy
+        # self.max_energy_eps = max_energy_eps
+        # self.max_energy_delta = max_energy_delta
+        # self.min_energy = min_energy
+        # self.max_valence_delta = max_valence_delta
+        # self.min_danceability = min_danceability
+        # self.max_tempo_delta = max_tempo_delta
+        self.min_choices = min_choices
+        self.num_tracks = num_tracks
+
         self.set_track_ids = set_track_ids
-        self.tempo_range = tempo_range
-        self.min_danceability = min_danceability
-        self.max_tempo_delta = max_tempo_delta
+        self.current_recommendations = set()
 
-        self.set_energy_levels = list(map(get_energy_level, self.set_track_ids))
+        self.set_energy_levels = list(map(get_energy, self.set_track_ids))
 
     def add_recommendations(self):
-        recommendation_track_ids = []
+        new_recommendation_track_ids = set()
 
-        while len(recommendation_track_ids) <= self.recommendations_as_sources:
+        c = 0
+
+        while len(new_recommendation_track_ids) <= self.num_recommendations_as_sources:
+
             # seed_tracks = [random.choice(recommendation_track_ids + list(self.source_track_ids))],
 
-            new_recommendations = sp.recommendations(
-                # seed_tracks=self.set_track_ids + recommendation_track_ids + list(self.source_track_ids),
-                seed_tracks=random_sample(self.set_track_ids + recommendation_track_ids + list(self.source_track_ids), 5),
-                limit=100,
-                min_danceability=self.min_danceability,
-                min_tempo=self.tempo_range[0],
-                max_tempo=self.tempo_range[1],
+            last_track_id = self.set_track_ids[-1]
+            next_track_ind = len(self.set_track_ids)
 
+            kwargs = dict()
+
+            for attribute in self.simple_attributes:
+                param = f'min_{attribute}'
+                kwargs[param] = max(self.params[param], get_feature(last_track_id, attribute) - self.params[f'max_{attribute}_delta'])
+
+                param = f'max_{attribute}'
+                kwargs[param] = min(self.params[param], get_feature(last_track_id, attribute) + self.params[f'max_{attribute}_delta'])
+
+                if (target := self.params[f'{attribute}_targets'][next_track_ind]) is not None:
+                    kwargs[f'target_{attribute}'] = target
+
+            pprint(kwargs)
+
+            new_recommendations = sp.recommendations(
+                seed_tracks=random_sample(self.set_track_ids + list(self.vibe_track_ids), 4) + [last_track_id],
+                limit=100,
+                **kwargs
             )['tracks']
 
-            new_recommendation_track_ids = [recommendation['id'] for recommendation in new_recommendations]
-            recommendation_track_ids += new_recommendation_track_ids
+            # new_recommendations = sp.recommendations(
+            #     # seed_tracks=self.set_track_ids + recommendation_track_ids + list(self.source_track_ids),
+            #     # seed_tracks=random_sample(self.set_track_ids + recommendation_track_ids + list(self.source_track_ids), 5),
+            #     # seed_tracks=random_sample(self.set_track_ids + list(self.vibe_track_ids) + list(self.current_recommendations), 4) + [self.set_track_ids[-1]],
+            #     seed_tracks=random_sample(self.set_track_ids + list(self.vibe_track_ids), 4) + [last_track_id],
+            #     limit=100,
+            #     min_danceability=self.min_danceability,
+            #     # min_energy=self.min_energy,
+            #     min_energy=max(self.min_energy, get_energy(last_track_id) - self.max_energy_delta),
+            #     # max_energy=min(self.max_energy, get_energy(last_track_id) - self.max_energy_delta),
+            #     min_tempo=self.tempo_range[0],
+            #     max_tempo=self.tempo_range[1],
+            #
+            # )['tracks']
 
-        self.source_track_ids.update(recommendation_track_ids)
-        self.source_track_ids = set(filter(self.features_are_acceptable, self.source_track_ids))
+            new_recommendation_track_ids.update(set([recommendation['id'] for recommendation in new_recommendations]))
+            # new_recommendation_track_ids.update(new_recommendation_track_ids)
+            # recommendation_track_ids += new_recommendation_track_ids
+
+            if c > 0:
+                print(c)
+            c += 1
+
+        # self.current_recommendations += recommendation_track_ids
+        self.current_recommendations.update(new_recommendation_track_ids)
+        self.current_recommendations.update(self.vibe_track_ids)
+        # self.source_track_ids.update(recommendation_track_ids)
+        # self.vibe_track_ids.update(set(filter(self.features_are_acceptable, self.vibe_track_ids)))
 
     def set_duration(self):
         milliseconds = sum([get_audio_features(track_id)['duration_ms'] for track_id in self.set_track_ids])
         return timedelta(milliseconds=milliseconds)
 
-    def run(self):
+    def compatible(self, track_id):  # todo: filter for compatibility again
+
+        # target_energy_level = self.target_energy[len(self.set_track_ids)]
+
+        conditions = [
+            track_id not in self.set_track_ids,
+            # in_delta(
+            #     val=get_energy(track_id),
+            #     target=target_energy_level,
+            #     delta=self.max_energy_eps
+            # ),
+
+        ]
+            # + [in_delta(self.params[f''])]
+
+        if len(self.set_track_ids) > 0:
+            last_track_id = self.set_track_ids[-1]
+
+            # conditions.append(in_delta(
+            #     val=get_energy(track_id),
+            #     target=get_energy(last_track_id),
+            #     delta=self.max_energy_delta
+            # ))
+            #
+            # conditions.append(in_delta(
+            #     val=get_valence(track_id),
+            #     target=get_valence(last_track_id),
+            #     delta=self.max_valence_delta
+            # ))
+            #
+            # conditions.append(abs(get_tempo(last_track_id) - get_tempo(track_id)) <= self.max_tempo_delta)
+
+            last_camelot = camelot_from_track_id(last_track_id)
+            conditions.append(camelot_from_track_id(track_id) in CamelotWheel.compatibles(last_camelot), )
+
+        return all(conditions)
+
+    def run(self, auto):
 
         self.add_recommendations()
 
@@ -441,39 +585,28 @@ class PathBuilder:
 
         fprint('Your set playlist has been created!')
 
-        while (num_tracks := len(self.set_track_ids)) < len(self.target_energy_levels):
-            target_energy_level = self.target_energy_levels[num_tracks]
+        while (current_num_tracks := len(self.set_track_ids)) < self.num_tracks:
+            target_energy_level = self.params['energy_targets'][current_num_tracks]
 
-            def compatible(track_id):
-                conditions = [
-                    track_id not in self.set_track_ids,
-                    in_delta(
-                        val=get_energy_level(track_id),
-                        target=target_energy_level,
-                        delta=self.max_energy_delta
-                    )
-                ]
-
-                if len(self.set_track_ids) > 0:
-                    last_track_id = self.set_track_ids[-1]
-                    last_camelot = camelot_from_track_id(last_track_id)
-                    conditions.append(camelot_from_track_id(track_id) in CamelotWheel.compatibles(last_camelot), )
-
-                    conditions.append(abs(get_tempo(last_track_id) - get_tempo(track_id)) <= self.max_tempo_delta)
-
-                return all(conditions)
-
-            compatible_track_ids = list(filter(compatible, self.source_track_ids))
+            compatible_track_ids = list(filter(self.compatible, self.current_recommendations))
+            compatible_track_ids = sorted(compatible_track_ids, key=get_popularity, reverse=True)
 
             click.clear()
-            if len(compatible_track_ids) == 0:
+            fprint(f'Gathered {len(self.current_recommendations)} recommendations.')
+            fprint(f'Of those, {len(compatible_track_ids)} are currently compatible')
+            if len(compatible_track_ids) < self.min_choices:
                 last_camelot = None
-                fprint('<red>no compatible tracks found</red>')
-                if click.confirm('Would you like to add more tracks to the track pool?'):
-                    self.add_recommendations()
-                    continue
-                else:
-                    break
+
+                fprint(f'To few choices ({len(compatible_track_ids)} < {self.min_choices}). Adding more...')
+                self.add_recommendations()
+                continue
+
+                # fprint('<red>no compatible tracks found</red>')
+                # if click.confirm('Would you like to add more tracks to the track pool?'):
+                #     self.add_recommendations()
+                #     continue
+                # else:
+                #     break
             else:
                 last_track_id = self.set_track_ids[-1]
                 last_camelot = camelot_from_track_id(last_track_id)
@@ -481,41 +614,53 @@ class PathBuilder:
             track_name_dict = {track_name(track_id): track_id for track_id in compatible_track_ids}
             track_names = list(track_name_dict.keys())
 
-            print(f'current set length: {self.set_duration()} ({len(self.set_track_ids)}/{len(self.target_energy_levels)})')
-            print(f'current energy levels:\n{list(map(get_energy_level, self.set_track_ids))}')
+            print(f'current set length: {self.set_duration()} ({len(self.set_track_ids)}/{self.num_tracks})')
+            print(f'current energy levels:\n{list(map(get_energy, self.set_track_ids))}')
+            print(f'current valances levels:\n{list(map(get_valence, self.set_track_ids))}')
             print(f'current keys:\n{list(map(get_track_key, self.set_track_ids))}')
-            print(f'the following compatible tracks have been found for key {last_camelot} and energy level {target_energy_level}:')
+            print(f'the following compatible tracks have been found for key {last_camelot} and energy level {target_energy_level} (energy, key, valence, popularity):')
             # pprint([(track_name(track_id), get_energy_level(track_id)) for track_id in compatible_track_ids])
-            print('\n'.join([f'\t{track_name(track_id)} {(get_energy_level(track_id), get_track_key(track_id))}' for track_id in compatible_track_ids]))
+            print('\n'.join(
+                [f'\t{track_name(track_id)} {(get_energy(track_id), get_track_key(track_id), get_valence(track_id), get_popularity(track_id))}' for track_id in
+                 compatible_track_ids]))
             playlist_name = '!Options'
 
-            playlist_from_track_ids(compatible_track_ids, playlist_name)
-            print(f'The playlist "{playlist_name}" has been created for you to browse your options')
-            print('')
+            if not auto:
 
-            validator = Validator.from_callable(
-                lambda track_id: track_id in track_names or track_id == '!',
-                error_message='invalid',
-                move_cursor_to_end=True
-            )
+                if playlist_with_name_exists(playlist_name):
+                    delete_all_playlists_with_name(playlist_name)
 
-            track_name_completer = WordCompleter(track_names)
-            selected_track_name = sesh.prompt(
-                'What song would you like to add to your set?\n\t',
-                completer=track_name_completer,
-                validator=validator,
-                complete_while_typing=True,
-            )
+                playlist_from_track_ids([last_track_id] + compatible_track_ids, playlist_name)
+                print(f'The playlist "{playlist_name}" has been created for you to browse your options')
+                print('')
 
-            if selected_track_name == '!':
-                self.add_recommendations()
-                continue
+                validator = Validator.from_callable(
+                    lambda track_id: track_id in track_names or track_id == '!',
+                    error_message='invalid',
+                    move_cursor_to_end=True
+                )
 
-            selected_track_id = track_name_dict[selected_track_name]
+                track_name_completer = WordCompleter(track_names)
+                selected_track_name = sesh.prompt(
+                    'What song would you like to add to your set?\n\t',
+                    completer=track_name_completer,
+                    validator=validator,
+                    complete_while_typing=True,
+                )
+
+                if selected_track_name == '!':
+                    self.add_recommendations()
+                    continue
+
+                selected_track_id = track_name_dict[selected_track_name]
+
+            else:
+                selected_track_id = compatible_track_ids[0]
 
             add_tracks_to_playlist([selected_track_id], set_playlist_id)
 
             self.set_track_ids.append(selected_track_id)
+            self.current_recommendations = set()
 
     def features_are_acceptable(self, track_id):
 
@@ -529,7 +674,7 @@ class PathBuilder:
         ])
 
 
-def detour(playlist_id, track_id, playlist_name='!detours'):
+def detour(playlist_id, track_id, playlist_name='!detours'):  # todo: update to implement energy /valence eps / delta and others
     track_id = sp._get_id('track', track_id)
     playlist_track_ids = get_track_ids_from_playlist(playlist_id)
 
@@ -578,17 +723,24 @@ def build():
     # s1 = [7, 7.5, 8, 8, 7, 7, 8, 9, 8, 7, 8, 7, 8, 8, 9, 8, 7, 6]
     s1 = [7, 7.5, 8, 8, 7, 7, 8, 9, 8, 7, 8, 7, 8, 8, 9, 8, 7, 7, 8, 9, 8, 7, 8, 8, 9, 7]
     pb = PathBuilder(
-        target_energy_levels=list(map(lambda x: x / 10, s1)),
-        # set_track_ids=get_track_ids_from_playlist('spotify:playlist:5jEcbW8DgZ8JXLN2C5Vb8U'),
-        # set_track_ids=get_track_ids_from_playlist('spotify:playlist:4iaEvwE8QHrO8R3BArsDjR'),
-        set_track_ids=get_track_ids_from_playlist('spotify:playlist:4iaEvwE8QHrO8R3BArsDjR'),
-        # source_track_ids=get_track_ids_from_playlist('spotify:playlist:0y9dVuUSznIeJxuHPsF1SF'),
-        max_tempo_delta=10,
-        max_energy_delta=1,
-        # set_track_ids=get_track_ids_from_playlist('spotify:playlist:3kGLLjPUo6DxUELIGm6BJb'),
-        # source_track_ids=get_track_ids_from_playlist('spotify:playlist:6SrtkL4ojme8ylAWcLtWra'),
+        # target_energy=list(map(lambda x: x / 10, s1)),
+        # max_tempo_delta=10,
+        # max_energy_delta=0.1,
+        # max_valence_delta=0.1,
+        # min_tempo=110,
+        # max_tempo=140,
+        # min_danceability=0.6,
+        set_track_ids=get_track_ids_from_playlist('spotify:playlist:5mR5DzgohQmdbX8qc1zrPX'),
+        # vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:0eKWB1M6jEZexdA7yA82Ly'),
+        vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:3hLPOzTOfZ6Sv26QqebV3J'),
+        # set_track_ids=get_track_ids_from_playlist(get_playlist_id_by_name('who dat')),
+        # vibe_track_ids=get_track_ids_from_playlist(get_playlist_id_by_name('techy')),
     )
-    pb.run()
+    pb.run(auto=False)
+
+    # todo: set URI's in cli
+    # todo: add new songs to original playlist, not new
+    # todo: in auto mode, create !Flag set for trach that should be blacklisted and replaced in current set
 
 
 if __name__ == '__main__':
