@@ -1,3 +1,4 @@
+import pathlib
 import time
 from pprint import pformat
 
@@ -27,7 +28,7 @@ def get_user_sp():
 
     if _user_sp is None:
         scope = 'playlist-read-collaborative, playlist-modify-public, playlist-read-private, playlist-modify-private, user-read-private'
-        _user_sp = spotipy.Spotify(auth_manager=SpotifyOAuth(cache_path='cache/spotipy.cache', redirect_uri='https://example.com/callback/', scope=scope))
+        _user_sp = spotipy.Spotify(auth_manager=SpotifyOAuth(cache_path=os.path.join('cache', 'spotipy.cache'), redirect_uri='https://example.com/callback/', scope=scope))
 
     return _user_sp
 
@@ -215,7 +216,7 @@ def get_bitrate(fname):
 
 
 def get_tracks_from_playlist(playlist_id):  # todo: only returns 100. why? -> fix
-    results = sp.playlist_tracks(playlist_id)
+    results = sp.playlist_items(playlist_id, additional_types=('track',))
     tracks = results['items']
     while results['next']:
         results = sp.next(results)
@@ -353,7 +354,7 @@ if __name__ == '__main__':
     pass
 
     # get_energy_level(tids[0])
-    print(get_energy('spotify:track:7mA03cPnG3UkLgf1ed87fI'))
+    # print(get_energy('spotify:track:7mA03cPnG3UkLgf1ed87fI'))
 
     # fs = get_audio_features(tids)
     # fss = sorted(fs, key=lambda f: f['danceability'])

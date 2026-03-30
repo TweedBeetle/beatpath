@@ -13,4 +13,4 @@ matplotlib
 prompt_toolkit
 click
 fuzzyfinder
-numpy==1.19.3
+numpy

@@ -28,7 +28,7 @@ class CamelotWheel:
                 f'{cls.special_mod(key_number + 1)}{key_letter}',
                 f'{cls.special_mod(key_number - 1)}{key_letter}',
 
-                f'{cls.special_mod(key_number + 2)}{key_letter}',
+                # f'{cls.special_mod(key_number + 2)}{key_letter}',
                 # f'{cls.special_mod(key_number - 2)}{key_letter}',
                 # f'{cls.special_mod(key_number + 5)}{key_letter}',
                 # f'{cls.special_mod(key_number - 5)}{key_letter}',

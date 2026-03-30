@@ -206,7 +206,7 @@ class BeatPath:  # @todo: minimum dancability and bpm range
 
         self.source_track_ids = set(self.featureses.keys())
 
-        print(len(self.source_track_ids))
+        # print(len(self.source_track_ids))
 
         self.camelot_bins = {camelot: set() for camelot in CamelotWheel.all()}
         for track_id in self.source_track_ids:
@@ -488,7 +488,7 @@ class PathBuilder:
                 if (target := self.params[f'{attribute}_targets'][next_track_ind]) is not None:
                     kwargs[f'target_{attribute}'] = target
 
-            pprint(kwargs)
+            # pprint(kwargs)
 
             new_recommendations = sp.recommendations(
                 seed_tracks=random_sample(self.set_track_ids + list(self.vibe_track_ids), 4) + [last_track_id],
@@ -572,11 +572,12 @@ class PathBuilder:
 
         sesh = PromptSession()
 
-        set_playlist_name = sesh.prompt(
-            'How would you like to name your set playlist?\n',
-            default=track_name(self.set_track_ids[0]) + ' set' if len(self.set_track_ids) > 0 else '',
-            validator=None
-        )
+        set_playlist_name = track_name(self.set_track_ids[0]) + ' set'
+        # set_playlist_name = sesh.prompt(
+        #     'How would you like to name your set playlist?\n',
+        #     default=track_name(self.set_track_ids[0]) + ' set' if len(self.set_track_ids) > 0 else '',
+        #     validator=None
+        # )
 
         set_playlist_id = create_playlist(set_playlist_name)
 
@@ -722,17 +723,25 @@ def build():
 
     # s1 = [7, 7.5, 8, 8, 7, 7, 8, 9, 8, 7, 8, 7, 8, 8, 9, 8, 7, 6]
     s1 = [7, 7.5, 8, 8, 7, 7, 8, 9, 8, 7, 8, 7, 8, 8, 9, 8, 7, 7, 8, 9, 8, 7, 8, 8, 9, 7]
+    # get_track_ids_from_playlist('spotify:playlist:68CXOViudkVU1KGSPBtKat')
+    # 'https://open.spotify.com/playlist/68CXOViudkVU1KGSPBtKat?si=437427267b674be7'
+    # assert False
     pb = PathBuilder(
         # target_energy=list(map(lambda x: x / 10, s1)),
-        # max_tempo_delta=10,
-        # max_energy_delta=0.1,
-        # max_valence_delta=0.1,
+        max_tempo_delta=8,
+        max_energy_delta=0.3,
+        max_valence_delta=0.5,
         # min_tempo=110,
         # max_tempo=140,
-        # min_danceability=0.6,
-        set_track_ids=get_track_ids_from_playlist('spotify:playlist:5mR5DzgohQmdbX8qc1zrPX'),
-        # vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:0eKWB1M6jEZexdA7yA82Ly'),
-        vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:3hLPOzTOfZ6Sv26QqebV3J'),
+        min_danceability=0.6,
+        # set_track_ids=get_track_ids_from_playlist('spotify:playlist:4IATMbXwftjFMbTinOrKDj'), # bar abend v2
+        set_track_ids=get_track_ids_from_playlist('spotify:playlist:1rilNNIDbpSR3LpX6zVMHq'),
+        # set_track_ids=get_track_ids_from_playlist('spotify:playlist:5VOtY0sc5dmHD4RKjli42u'), # bar abend v3
+        # vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:3rJbhgis2p1S0kinRA1mHb'),
+        vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:3Jxeuy5RFUIHTJJQdxnVxj'),
+        # vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:4xwd1Ip5jUaK8N5arxZmsE'), # lofi house
+        # vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:5o0H1MHlo6L78VNIXecOdt'), # bootique house
+        # vibe_track_ids=get_track_ids_from_playlist('spotify:playlist:5o0H1MHlo6L78VNIXecOdt'), # bootique house
         # set_track_ids=get_track_ids_from_playlist(get_playlist_id_by_name('who dat')),
         # vibe_track_ids=get_track_ids_from_playlist(get_playlist_id_by_name('techy')),
     )

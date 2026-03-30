@@ -61,7 +61,7 @@ class BillyRowHamilton:
                 # Add next step to generator buffer
                 self.generator_buffer.append(WalkStatus(neighbor, visited.copy(), path[:]))
             # Add path if acceptable
-            print(len(path))
+            # print(len(path))
             if len(path) >= acceptable_length:
                 paths.append(path)
                 bar.update()
